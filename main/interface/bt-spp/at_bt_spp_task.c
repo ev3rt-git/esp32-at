@@ -28,6 +28,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "string.h"
+#include "esp_log.h"
 #include "esp_at.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -551,6 +552,7 @@ static esp_at_cmd_struct at_custom_cmd[] = {
 
 void at_status_callback (esp_at_status_type status)
 {
+#if 0 // TODO: legacy code
 #if defined(CONFIG_TARGET_PLATFORM_ESP32)
     switch (status) {
     case ESP_AT_STATUS_NORMAL:
@@ -561,10 +563,13 @@ void at_status_callback (esp_at_status_type status)
         break;
     }
 #endif
+#endif
+    ESP_LOGI("AT@SPP", "TODO: %s called" , __FUNCTION__);
 }
 
 void at_pre_deepsleep_callback (void)
 {
+#if 0 // TODO: legacy code
     /* Do something before deep sleep
      * Set uart pin for power saving
     */
@@ -572,18 +577,24 @@ void at_pre_deepsleep_callback (void)
     gpio_set_direction(CONFIG_AT_UART_PORT_RX_PIN_DEFAULT,0);
     gpio_set_direction(CONFIG_AT_UART_PORT_RTS_PIN_DEFAULT,0);
     gpio_set_direction(CONFIG_AT_UART_PORT_CTS_PIN_DEFAULT,0);
+#endif
+    ESP_LOGI("AT@SPP", "TODO: %s called" , __FUNCTION__);
 }
 
 void at_pre_restart_callback (void)
 {
+#if 0 // TODO: legacy code
     /* Do something before restart
     */
     uart_disable_rx_intr(esp_at_uart_port);
     esp_at_port_wait_write_complete(portMAX_DELAY);
+#endif
+    ESP_LOGI("AT@SPP", "TODO: %s called" , __FUNCTION__);
 }
 
 void at_interface_init (void)
 {
+#if 0 // TODO: legacy code
     esp_at_device_ops_struct esp_at_device_ops = {
         .read_data = at_port_read_data,
         .write_data = at_port_write_data,
@@ -601,11 +612,17 @@ void at_interface_init (void)
 
     esp_at_device_ops_regist (&esp_at_device_ops);
     esp_at_custom_ops_regist(&esp_at_custom_ops);
+#endif
+    ESP_LOGI("AT@SPP", "TODO: %s called" , __FUNCTION__);
 }
 
 
 void at_custom_init(void)
 {
+#if 0 // TODO: legacy code
     esp_at_custom_cmd_array_regist (at_custom_cmd, sizeof(at_custom_cmd)/sizeof(at_custom_cmd[0]));
     esp_at_port_write_data((uint8_t *)"\r\nready\r\n",strlen("\r\nready\r\n"));
+#endif
+    extern void spp_acceptor_init();
+    spp_acceptor_init();
 }
