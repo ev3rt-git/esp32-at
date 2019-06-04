@@ -19,6 +19,10 @@ ifdef CONFIG_AT_BASE_ON_SDIO
 COMPONENT_SRCDIRS += interface/sdio
 endif
 
+ifdef CONFIG_AT_BASE_ON_BT_SPP
+COMPONENT_SRCDIRS += interface/bt-spp
+endif
+
 COMPONENT_ADD_INCLUDEDIRS := .
 
 
