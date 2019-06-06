@@ -11,8 +11,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_at.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_gap_bt_api.h"
@@ -46,6 +48,52 @@ static long data_num = 0;
 static const esp_spp_sec_t sec_mask = ESP_SPP_SEC_AUTHENTICATE;
 static const esp_spp_role_t role_slave = ESP_SPP_ROLE_SLAVE;
 
+
+static uint32_t connection_handle = 0; // TODO: protect this?
+static uint8_t *data_buf = NULL;
+static uint32_t data_len = 0;
+static xSemaphoreHandle data_received_semaphore;
+
+int32_t bt_spp_read_data(uint8_t* buf, int32_t length) {
+    ESP_LOGI(SPP_TAG, "%s, len=%d, data_len=%d",
+        __FUNCTION__, length, data_len);
+
+    /*
+     * data_len WILL be modified after giving the semaphore,
+     * copy it to local.
+     */
+    assert(length >= data_len);
+    if ((length = data_len) == 0) {
+        return 0;
+    }
+
+    assert(buf != NULL);
+    memcpy(buf, data_buf, length);
+
+    int res;
+    res = xSemaphoreGive(data_received_semaphore);
+    assert(res == pdTRUE);
+
+    return length;
+}
+
+int32_t bt_spp_write_data(uint8_t*data,int32_t len)
+{
+    ESP_LOGI(SPP_TAG, "%s, len %d" , __FUNCTION__, len);
+
+    if (connection_handle == 0) {
+        return 0;
+    }
+
+    esp_err_t ret = esp_spp_write(connection_handle, len, data);
+    if (ret != ESP_OK) {
+        ESP_LOGE(SPP_TAG, "%s spp write failed: %s\n", __func__, esp_err_to_name(ret));
+        return 0;
+    }
+
+    return len;
+}
+
 static void print_speed(void)
 {
     float time_old_s = time_old.tv_sec + time_old.tv_usec / 1000000.0;
@@ -75,6 +123,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
         break;
     case ESP_SPP_CLOSE_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_CLOSE_EVT");
+        connection_handle = 0;
         break;
     case ESP_SPP_START_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_START_EVT");
@@ -82,7 +131,17 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     case ESP_SPP_CL_INIT_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_CL_INIT_EVT");
         break;
-    case ESP_SPP_DATA_IND_EVT:
+    case ESP_SPP_DATA_IND_EVT: {
+        data_buf = param->data_ind.data;
+        data_len = param->data_ind.len;
+        ESP_LOGI(SPP_TAG, "ESP_SPP_DATA_IND_EVT len=%d handle=%d",
+                 param->data_ind.len, param->data_ind.handle);
+        int ret = esp_at_port_recv_data_notify(param->data_ind.len, portMAX_DELAY);
+        assert(ret);
+        ret = xSemaphoreTake(data_received_semaphore, portMAX_DELAY);
+        assert(ret == pdTRUE);
+        data_len = 0;
+        }
 #if (SPP_SHOW_MODE == SPP_SHOW_DATA)
         ESP_LOGI(SPP_TAG, "ESP_SPP_DATA_IND_EVT len=%d handle=%d",
                  param->data_ind.len, param->data_ind.handle);
@@ -104,6 +163,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     case ESP_SPP_SRV_OPEN_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_SRV_OPEN_EVT");
         gettimeofday(&time_old, NULL);
+        connection_handle = param->srv_open.handle;
         break;
     default:
         break;
@@ -159,6 +219,9 @@ void esp_bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
 
 void spp_acceptor_init()
 {
+    data_received_semaphore = xSemaphoreCreateBinary();
+    assert(data_received_semaphore != NULL);
+
     esp_err_t ret;
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
