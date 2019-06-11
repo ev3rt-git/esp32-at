@@ -190,5 +190,12 @@ void spp_acceptor_init()
         ESP_LOGE(SPP_TAG, "%s gap set pin failed: %s\n", __func__, esp_err_to_name(ret));
         return;
     }
+
+    uint8_t mac[6];
+    if ((ret = esp_read_mac(mac, ESP_MAC_BT)) != ESP_OK) {
+        ESP_LOGE(SPP_TAG, "%s read mac failed: %s\n", __func__, esp_err_to_name(ret));
+        return;
+    }
+    printf("BT Addr: %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
