@@ -175,6 +175,23 @@ void spp_acceptor_init()
         return;
     }
 
+    /* Clean paired devices */
+    while (1) {
+        esp_bd_addr_t dev_addr;
+        int dev_num = 1;
+        if ((ret = esp_bt_gap_get_bond_device_list(&dev_num, &dev_addr)) != ESP_OK) {
+            ESP_LOGE(SPP_TAG, "%s cleanup failed: %s\n", __func__, esp_err_to_name(ret));
+            return;
+        }
+        if (dev_num == 0) break;
+        if ((ret = esp_bt_gap_remove_bond_device(dev_addr)) != ESP_OK) {
+            ESP_LOGE(SPP_TAG, "%s cleanup failed: %s\n", __func__, esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(SPP_TAG, "remove bond device %02x:%02x:%02x:%02x:%02x:%02x\n", \
+            dev_addr[0], dev_addr[1], dev_addr[2], dev_addr[3], dev_addr[4], dev_addr[5]);
+    }
+
     /* Set default parameters for Secure Simple Pairing */
     esp_bt_sp_param_t param_type = ESP_BT_SP_IOCAP_MODE;
     esp_bt_io_cap_t iocap = ESP_BT_IO_CAP_IO;
